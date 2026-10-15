@@ -146,13 +146,13 @@ static void fsm_step(uint8_t rising)
         /* TODO: any one-time setup */
         memory = 0;
         current_state = STATE_SELECT_OPERAND1;
+        op = OP_ADD;
         break;
 
     case STATE_SELECT_OPERAND1:
         flags &= ~FLAG_OPERAND2;
         operand1 = 0;
         operand2 = 0;
-        op = OP_ADD;
         clear_digits();
         current_state = STATE_DIGIT1;
         break;
