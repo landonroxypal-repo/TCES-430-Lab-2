@@ -22,8 +22,295 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
+/* ---------------------------------------------------------------------------
+ * FSM definitions
+ * ------------------------------------------------------------------------- */
+
+typedef enum {
+    STATE_INIT,
+    STATE_SELECT_OPERAND1,
+    STATE_SELECT_OPERAND2,
+    STATE_DIGIT1,
+    STATE_DIGIT1_INC,
+    STATE_DIGIT2,
+    STATE_DIGIT2_INC,
+    STATE_DIGIT3,
+    STATE_DIGIT3_INC,
+    STATE_DIGIT4,
+    STATE_DIGIT4_INC,
+    STATE_OPERATOR,
+    STATE_OPERATOR_INC,
+    STATE_COMPUTE,
+    STATE_ERROR,
+    STATE_SHOW_ANSWER,
+    STATE_SAVE_ANSWER
+} State;
+
+typedef enum {
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_COUNT
+} Operator;
+
+/* Status flags */
+#define FLAG_OPERAND2   (1u << 0)   /* Set while entering operand 2 */
+
+#define MAX_RESULT      9999
+
+/* Input bit positions (used for edge detection) */
+#define IN_SW1          (1u << 0)
+#define IN_SW2          (1u << 1)
+#define IN_SW3          (1u << 2)
+#define IN_SW4          (1u << 3)
+#define IN_ONBOARD      (1u << 4)
+
+/* ---------------------------------------------------------------------------
+ * FSM data
+ * ------------------------------------------------------------------------- */
+
+static State    current_state = STATE_INIT;
+static uint8_t  flags;
+
+static uint8_t  digits[4];          /* digits[0] = Digit1 (thousands) ... digits[3] = Digit4 (ones) */
+static uint16_t operand1;
+static uint16_t operand2;
+static Operator op;
+static int32_t  answer;
+static uint16_t memory;             /* Last saved calculation */
+
+static uint8_t  inputs_prev;
+
+/* ---------------------------------------------------------------------------
+ * Hardware stubs - fill in once pins are initialized
+ * ------------------------------------------------------------------------- */
+
+/* Returns the raw (debounced) level of each input as IN_* bits */
+static uint8_t read_inputs(void)
+{
+    uint8_t inputs = 0;
+    /* TODO: read SW1-SW4 and the onboard button into IN_* bits */
+    return inputs;
+}
+
+/* Shows a value on the 7-segment display */
+static void display_value(uint16_t value)
+{
+    (void)value;
+    /* TODO: drive the 7-segment display */
+}
+
+/* Shows the current operator on the 7-segment display */
+static void display_operator(Operator o)
+{
+    (void)o;
+    /* TODO: drive the 7-segment display */
+}
+
+/* Shows an error indication on the 7-segment display */
+static void display_error(void)
+{
+    /* TODO: drive the 7-segment display */
+}
+
+/* ---------------------------------------------------------------------------
+ * Helpers
+ * ------------------------------------------------------------------------- */
+
+static uint16_t digits_to_value(void)
+{
+    return (uint16_t)(digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3]);
+}
+
+static void clear_digits(void)
+{
+    for (int i = 0; i < 4; i++) {
+        digits[i] = 0;
+    }
+}
+
+static void increment_digit(uint8_t index)
+{
+    digits[index] = (uint8_t)((digits[index] + 1) % 10);
+}
+
+/* ---------------------------------------------------------------------------
+ * FSM step - called once per main loop iteration
+ * ------------------------------------------------------------------------- */
+
+static void fsm_step(uint8_t rising)
+{
+    switch (current_state) {
+    case STATE_INIT:
+        /* TODO: any one-time setup */
+        memory = 0;
+        current_state = STATE_SELECT_OPERAND1;
+        break;
+
+    case STATE_SELECT_OPERAND1:
+        flags &= ~FLAG_OPERAND2;
+        operand1 = 0;
+        operand2 = 0;
+        op = OP_ADD;
+        clear_digits();
+        current_state = STATE_DIGIT1;
+        break;
+
+    case STATE_SELECT_OPERAND2:
+        flags |= FLAG_OPERAND2;
+        clear_digits();
+        current_state = STATE_DIGIT1;
+        break;
+
+    /* ----- Digit entry (shared by operand 1 and operand 2) ----- */
+    case STATE_DIGIT1:
+        if (rising & IN_SW1)      current_state = STATE_DIGIT1_INC;
+        else if (rising & IN_SW4) current_state = STATE_DIGIT2;
+        break;
+
+    case STATE_DIGIT1_INC:
+        increment_digit(0);
+        current_state = STATE_DIGIT1;
+        break;
+
+    case STATE_DIGIT2:
+        if (rising & IN_SW1)      current_state = STATE_DIGIT2_INC;
+        else if (rising & IN_SW4) current_state = STATE_DIGIT3;
+        break;
+
+    case STATE_DIGIT2_INC:
+        increment_digit(1);
+        current_state = STATE_DIGIT2;
+        break;
+
+    case STATE_DIGIT3:
+        if (rising & IN_SW1)      current_state = STATE_DIGIT3_INC;
+        else if (rising & IN_SW4) current_state = STATE_DIGIT4;
+        break;
+
+    case STATE_DIGIT3_INC:
+        increment_digit(2);
+        current_state = STATE_DIGIT3;
+        break;
+
+    case STATE_DIGIT4:
+        if (rising & IN_SW1) {
+            current_state = STATE_DIGIT4_INC;
+        } else if (rising & IN_SW4) {
+            if (flags & FLAG_OPERAND2) {
+                /* Finished operand 2 */
+                operand2 = digits_to_value();
+                current_state = STATE_COMPUTE;
+            } else {
+                /* Finished operand 1 */
+                operand1 = digits_to_value();
+                current_state = STATE_OPERATOR;
+            }
+        }
+        break;
+
+    case STATE_DIGIT4_INC:
+        increment_digit(3);
+        current_state = STATE_DIGIT4;
+        break;
+
+    /* ----- Operator selection ----- */
+    case STATE_OPERATOR:
+        if (rising & IN_SW2)      current_state = STATE_OPERATOR_INC;
+        else if (rising & IN_SW3) current_state = STATE_SELECT_OPERAND2;
+        break;
+
+    case STATE_OPERATOR_INC:
+        op = (Operator)((op + 1) % OP_COUNT);
+        current_state = STATE_OPERATOR;
+        break;
+
+    /* ----- Result ----- */
+    case STATE_COMPUTE:
+        switch (op) {
+        case OP_ADD: answer = (int32_t)operand1 + operand2; break;
+        case OP_SUB: answer = (int32_t)operand1 - operand2; break;
+        case OP_MUL: answer = (int32_t)operand1 * operand2; break;
+        case OP_DIV:
+            /* Divide by zero is an error: force the answer out of range */
+            answer = (operand2 == 0) ? -1 : (int32_t)(operand1 / operand2);
+            break;
+        default: break;
+        }
+        current_state = (answer < 0 || answer > MAX_RESULT) ? STATE_ERROR : STATE_SHOW_ANSWER;
+        break;
+
+    case STATE_ERROR:
+        if (rising & IN_SW4) current_state = STATE_SELECT_OPERAND1;
+        break;
+
+    case STATE_SHOW_ANSWER:
+        if (rising & IN_SW4)          current_state = STATE_SELECT_OPERAND1;
+        else if (rising & IN_ONBOARD) current_state = STATE_SAVE_ANSWER;
+        break;
+
+    case STATE_SAVE_ANSWER:
+        memory = (uint16_t)answer;
+        current_state = (rising & IN_SW4) ? STATE_SELECT_OPERAND1 : STATE_SHOW_ANSWER;
+        break;
+
+    default:
+        current_state = STATE_INIT;
+        break;
+    }
+
+}
+
+/* Updates the 7-segment display based on the current state */
+static void fsm_display(uint8_t level)
+{
+    /* For all states: onboard button held shows the last saved calculation.
+     * Show Answer / Save Answer use the onboard button to save instead. */
+    if ((level & IN_ONBOARD) &&
+        current_state != STATE_SHOW_ANSWER &&
+        current_state != STATE_SAVE_ANSWER) {
+        display_value(memory);
+        return;
+    }
+
+    switch (current_state) {
+    case STATE_DIGIT1: case STATE_DIGIT1_INC:
+    case STATE_DIGIT2: case STATE_DIGIT2_INC:
+    case STATE_DIGIT3: case STATE_DIGIT3_INC:
+    case STATE_DIGIT4: case STATE_DIGIT4_INC:
+        display_value(digits_to_value());
+        break;
+
+    case STATE_OPERATOR:
+    case STATE_OPERATOR_INC:
+        display_operator(op);
+        break;
+
+    case STATE_ERROR:
+        display_error();
+        break;
+
+    case STATE_SHOW_ANSWER:
+    case STATE_SAVE_ANSWER:
+        display_value((uint16_t)answer);
+        break;
+
+    default:
+        break;
+    }
+}
+
 int main(void)
 {
-    /* Loop forever */
-	for(;;);
+    /* TODO: clock and pin initialization */
+
+    for (;;) {
+        uint8_t level  = read_inputs();
+        uint8_t rising = level & ~inputs_prev;
+        inputs_prev = level;
+
+        fsm_step(rising);
+        fsm_display(level);
+    }
 }
