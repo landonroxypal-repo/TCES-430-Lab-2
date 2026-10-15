@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include "stm32f7xx.h"
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
@@ -80,13 +81,14 @@ static Operator op;
 static int32_t  answer;
 static uint16_t memory;             /* Last saved calculation */
 
-static uint8_t  inputs_prev;
+static uint8_t  inputs_prev = 0xFF;  /* All inputs idle high (pull-ups) */
 
 /* ---------------------------------------------------------------------------
  * Hardware stubs - fill in once pins are initialized
  * ------------------------------------------------------------------------- */
 
-/* Returns the raw (debounced) level of each input as IN_* bits */
+/* Returns the raw (debounced) level of each input as IN_* bits.
+ * Inputs are pulled up: a released button reads 1, a pressed button reads 0. */
 static uint8_t read_inputs(void)
 {
     uint8_t inputs = 0;
@@ -139,7 +141,7 @@ static void increment_digit(uint8_t index)
  * FSM step - called once per main loop iteration
  * ------------------------------------------------------------------------- */
 
-static void fsm_step(uint8_t rising)
+static void fsm_step(uint8_t falling)
 {
     switch (current_state) {
     case STATE_INIT:
@@ -165,8 +167,8 @@ static void fsm_step(uint8_t rising)
 
     /* ----- Digit entry (shared by operand 1 and operand 2) ----- */
     case STATE_DIGIT1:
-        if (rising & IN_SW1)      current_state = STATE_DIGIT1_INC;
-        else if (rising & IN_SW4) current_state = STATE_DIGIT2;
+        if (falling & IN_SW1)      current_state = STATE_DIGIT1_INC;
+        else if (falling & IN_SW4) current_state = STATE_DIGIT2;
         break;
 
     case STATE_DIGIT1_INC:
@@ -175,8 +177,8 @@ static void fsm_step(uint8_t rising)
         break;
 
     case STATE_DIGIT2:
-        if (rising & IN_SW1)      current_state = STATE_DIGIT2_INC;
-        else if (rising & IN_SW4) current_state = STATE_DIGIT3;
+        if (falling & IN_SW1)      current_state = STATE_DIGIT2_INC;
+        else if (falling & IN_SW4) current_state = STATE_DIGIT3;
         break;
 
     case STATE_DIGIT2_INC:
@@ -185,8 +187,8 @@ static void fsm_step(uint8_t rising)
         break;
 
     case STATE_DIGIT3:
-        if (rising & IN_SW1)      current_state = STATE_DIGIT3_INC;
-        else if (rising & IN_SW4) current_state = STATE_DIGIT4;
+        if (falling & IN_SW1)      current_state = STATE_DIGIT3_INC;
+        else if (falling & IN_SW4) current_state = STATE_DIGIT4;
         break;
 
     case STATE_DIGIT3_INC:
@@ -195,9 +197,9 @@ static void fsm_step(uint8_t rising)
         break;
 
     case STATE_DIGIT4:
-        if (rising & IN_SW1) {
+        if (falling & IN_SW1) {
             current_state = STATE_DIGIT4_INC;
-        } else if (rising & IN_SW4) {
+        } else if (falling & IN_SW4) {
             if (flags & FLAG_OPERAND2) {
                 /* Finished operand 2 */
                 operand2 = digits_to_value();
@@ -217,8 +219,8 @@ static void fsm_step(uint8_t rising)
 
     /* ----- Operator selection ----- */
     case STATE_OPERATOR:
-        if (rising & IN_SW2)      current_state = STATE_OPERATOR_INC;
-        else if (rising & IN_SW3) current_state = STATE_SELECT_OPERAND2;
+        if (falling & IN_SW2)      current_state = STATE_OPERATOR_INC;
+        else if (falling & IN_SW3) current_state = STATE_SELECT_OPERAND2;
         break;
 
     case STATE_OPERATOR_INC:
@@ -242,17 +244,17 @@ static void fsm_step(uint8_t rising)
         break;
 
     case STATE_ERROR:
-        if (rising & IN_SW4) current_state = STATE_SELECT_OPERAND1;
+        if (falling & IN_SW4) current_state = STATE_SELECT_OPERAND1;
         break;
 
     case STATE_SHOW_ANSWER:
-        if (rising & IN_SW4)          current_state = STATE_SELECT_OPERAND1;
-        else if (rising & IN_ONBOARD) current_state = STATE_SAVE_ANSWER;
+        if (falling & IN_SW4)          current_state = STATE_SELECT_OPERAND1;
+        else if (falling & IN_ONBOARD) current_state = STATE_SAVE_ANSWER;
         break;
 
     case STATE_SAVE_ANSWER:
         memory = (uint16_t)answer;
-        current_state = (rising & IN_SW4) ? STATE_SELECT_OPERAND1 : STATE_SHOW_ANSWER;
+        current_state = (falling & IN_SW4) ? STATE_SELECT_OPERAND1 : STATE_SHOW_ANSWER;
         break;
 
     default:
@@ -267,7 +269,7 @@ static void fsm_display(uint8_t level)
 {
     /* For all states: onboard button held shows the last saved calculation.
      * Show Answer / Save Answer use the onboard button to save instead. */
-    if ((level & IN_ONBOARD) &&
+    if (!(level & IN_ONBOARD) &&
         current_state != STATE_SHOW_ANSWER &&
         current_state != STATE_SAVE_ANSWER) {
         display_value(memory);
@@ -335,10 +337,10 @@ int main(void)
 
     for (;;) {
         uint8_t level  = read_inputs();
-        uint8_t rising = level & ~inputs_prev;
+        uint8_t falling = ~level & inputs_prev;
         inputs_prev = level;
 
-        fsm_step(rising);
+        fsm_step(falling);
         fsm_display(level);
     }
 }
