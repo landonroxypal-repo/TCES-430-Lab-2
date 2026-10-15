@@ -91,8 +91,8 @@ static uint8_t  inputs_prev = 0xFF;  /* All inputs idle high (pull-ups) */
  * Inputs are pulled up: a released button reads 1, a pressed button reads 0. */
 static uint8_t read_inputs(void)
 {
-    uint8_t inputs = 0;
-    /* TODO: read SW1-SW4 and the onboard button into IN_* bits */
+    uint8_t inputs = GPIOF->IDR & 0x0780;
+
     return inputs;
 }
 
