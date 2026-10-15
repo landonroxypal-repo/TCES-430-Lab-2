@@ -301,9 +301,37 @@ static void fsm_display(uint8_t level)
     }
 }
 
+/*
+ * Input pins are:
+ *
+ * A2 - SW1 - PF10
+ * A3 - SW2 - PF9
+ * A4 - SW3 - PF8
+ * A5 - SW4 - PF7
+ */
 int main(void)
 {
-    /* TODO: clock and pin initialization */
+	// 1. Enable the clock for GPIO port F
+	// In the AHB1ENR register, Bit 5 enables GPIOF
+	RCC->AHB1ENR |= (1UL << 5);
+
+	// Set pin PF10 as general purpose input
+	GPIOF->MODER &= ~(3UL << (2*10));
+	// Set pin PF9 as general purpose input
+	GPIOF->MODER &= ~(3UL << (2*9));
+	// Set pin PF8 as general purpose input
+	GPIOF->MODER &= ~(3UL << (2*8));
+	// Set pin PF7 as general purpose input
+	GPIOF->MODER &= ~(3UL << (2*7));
+
+	// 4. Configure PF10 to be Pull-up using GPIO_PUPDR
+	GPIOF->PUPDR |= (1UL << (2*10)); //PUPDR = Pull Up Pull Down Register
+	// 4. Configure PF9 to be Pull-up using GPIO_PUPDR
+	GPIOF->PUPDR |= (1UL << (2*9)); //PUPDR = Pull Up Pull Down Register
+	// 4. Configure PF8 to be Pull-up using GPIO_PUPDR
+	GPIOF->PUPDR |= (1UL << (2*8)); //PUPDR = Pull Up Pull Down Register
+	// 4. Configure PF7 to be Pull-up using GPIO_PUPDR
+	GPIOF->PUPDR |= (1UL << (2*7)); //PUPDR = Pull Up Pull Down Register
 
     for (;;) {
         uint8_t level  = read_inputs();
