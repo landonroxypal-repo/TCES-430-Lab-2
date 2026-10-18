@@ -61,10 +61,10 @@ typedef enum {
 #define MAX_RESULT      9999
 
 /* Input bit positions (used for edge detection) */
-#define IN_SW1          (1u << 0)
-#define IN_SW2          (1u << 1)
-#define IN_SW3          (1u << 2)
-#define IN_SW4          (1u << 3)
+#define IN_SW1          (1u << 3)
+#define IN_SW2          (1u << 2)
+#define IN_SW3          (1u << 1)
+#define IN_SW4          (1u << 0)
 #define IN_ONBOARD      (1u << 4)
 
 /* ---------------------------------------------------------------------------
@@ -91,7 +91,8 @@ static uint8_t  inputs_prev = 0xFF;  /* All inputs idle high (pull-ups) */
  * Inputs are pulled up: a released button reads 1, a pressed button reads 0. */
 static uint8_t read_inputs(void)
 {
-    uint8_t inputs = GPIOF->IDR & 0x0780;
+    uint8_t inputs = ((GPIOF->IDR & 0x0780) >> 7);
+    inputs |= ((~(GPIOI->IDR) & 0x0800) >> 7); // Shift 7 times to have the bit in position 4
 
     return inputs;
 }
@@ -310,12 +311,17 @@ static void fsm_display(uint8_t level)
  * A3 - SW2 - PF9
  * A4 - SW3 - PF8
  * A5 - SW4 - PF7
+ * B1 - B1 - PI11
  */
 int main(void)
 {
-	// 1. Enable the clock for GPIO port F
+	// Enable the clock for GPIO port F
 	// In the AHB1ENR register, Bit 5 enables GPIOF
 	RCC->AHB1ENR |= (1UL << 5);
+
+	// Enable the clock for GPIO port I
+	// In the AHB1ENR register, Bit 8 enables GPIOI
+	RCC->AHB1ENR |= (1UL << 8);
 
 	// Set pin PF10 as general purpose input
 	GPIOF->MODER &= ~(3UL << (2*10));
@@ -326,13 +332,16 @@ int main(void)
 	// Set pin PF7 as general purpose input
 	GPIOF->MODER &= ~(3UL << (2*7));
 
-	// 4. Configure PF10 to be Pull-up using GPIO_PUPDR
+	// Set pin PI11 as general purpose input
+	GPIOI->MODER &= ~(3UL << (2*11));
+
+	// Configure PF10 to be Pull-up using GPIO_PUPDR
 	GPIOF->PUPDR |= (1UL << (2*10)); //PUPDR = Pull Up Pull Down Register
-	// 4. Configure PF9 to be Pull-up using GPIO_PUPDR
+	// Configure PF9 to be Pull-up using GPIO_PUPDR
 	GPIOF->PUPDR |= (1UL << (2*9)); //PUPDR = Pull Up Pull Down Register
-	// 4. Configure PF8 to be Pull-up using GPIO_PUPDR
+	// Configure PF8 to be Pull-up using GPIO_PUPDR
 	GPIOF->PUPDR |= (1UL << (2*8)); //PUPDR = Pull Up Pull Down Register
-	// 4. Configure PF7 to be Pull-up using GPIO_PUPDR
+	// Configure PF7 to be Pull-up using GPIO_PUPDR
 	GPIOF->PUPDR |= (1UL << (2*7)); //PUPDR = Pull Up Pull Down Register
 
     for (;;) {
