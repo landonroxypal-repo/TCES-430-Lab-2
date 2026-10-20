@@ -17,7 +17,7 @@
  */
 
 #include <stdint.h>
-#include <stm32f7xx.h>
+#include "stm32f7xx.h"
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
@@ -27,6 +27,8 @@
 
 void initializePins();
 int translateCharacter(char);
+void flashSegment(char);
+void flashDisplay(char*);
 
 
 
@@ -43,7 +45,10 @@ int main(void)
 
     /* Loop forever */
 	for(;;);
+	return 0;
 }
+
+
 
 void initializePins()
 {
@@ -87,30 +92,54 @@ void initializePins()
 	GPIOB->MODER |= (0b0101 << (2 * 15)); // initializes D11 and D12
 }
 
-void flashSegments(char theCharacter)
+void flashDisplay(char *theString[]) {
+
+	// Flashes segment 1
+	flashSegment(*theString);
+
+	// turns on segment 1. Reset should happen during the flashSegment function
+	GPIOI->ODR |= 1;
+
+	// Flashes segment 2
+	flashSegment(*(++theString));
+
+	GPIOB->ODR |= (0b1 << 15);
+
+	// Flashes segment 3
+	flashSegment(*(++theString));
+
+	GPIOB->ODR |= (0b1 << 14);
+
+	// Flashes segment 4
+	flashSegment(*(++theString));
+
+	GPIOI->ODR |= (0b1 <<1);
+}
+
+void flashSegment(char theCharacter) // possibly add code to turn lights on and off
 {
 	int segmentCode = translateCharacter(theCharacter);
 
 	// Assigns bit 0 in the 7-segment display sequence to Segment A (D2 on the board, PG6 on the processor)
-	GPIOG->BSRR = 0 | ((segmentCode & 0b1) << 6);
+	GPIOG->ODR = 0 | ((segmentCode & 0b1) << 6);
 
 	// Assigns bit 1 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
-	GPIOB->BSRR = ((segmentCode & 0b10) << 4);
+	GPIOB->ODR = ((segmentCode & 0b10) << 4);
 
 	// Assigns bit 2 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
-	GPIOG->BSRR |= ((segmentCode & 0b100) << 7);
+	GPIOG->ODR |= ((segmentCode & 0b100) << 7);
 
 	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PA8 on the processor)
-	GPIOA->BSRR = 0 | ((segmentCode & 0b1000) << 8);
+	GPIOA->ODR = 0 | ((segmentCode & 0b1000) << 8);
 
 	// Assigns bit 4 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
-	GPIOH->BSRR = 0 | ((segmentCode & 0b10000) << 6);
+	GPIOH->ODR = 0 | ((segmentCode & 0b10000) << 6);
 
 	// Assigns bit 5 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
-	GPIOI->BSRR = 0 | ((segmentCode & 0b100000) << 3);
+	GPIOI->ODR = 0 | ((segmentCode & 0b100000) << 3);
 
 	// Assigns Bit 6 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
-	GPIOI->BSRR |= (SegmentCode & (0b1 << 6) <<2);
+	GPIOI->ODR |= (segmentCode & (0b1 << 6) <<2);
 }
 
 /**
@@ -176,8 +205,17 @@ int translateCharacter(char theCharacter)
 	case 'v':
 		segmentCode = 0b0011100;
 		break;
+	default:
+		segmentCode = 255;
+		break;
 	}
+
 	return segmentCode;
 }
 
 
+void simple_delay(uint32_t count) {
+    while (count--) {
+        __asm__("NOP");
+    }
+}
