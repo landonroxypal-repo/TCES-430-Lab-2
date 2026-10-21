@@ -464,7 +464,7 @@ int translateCharacter(char theCharacter)
 		segmentCode = 0b0110000;
 		break;
 	case 'i':
-		segmentCode = 0b1001000;
+		segmentCode = 0b1111001;
 		break;
 	case 'l':
 		segmentCode = 0b1110001;
@@ -483,7 +483,7 @@ int translateCharacter(char theCharacter)
 		segmentCode = 0b1000001;
 		break;
 	case 'v':
-		segmentCode = 0b0011100;
+		segmentCode = 0b1010101;
 		break;
 	default:
 		segmentCode = 255;
