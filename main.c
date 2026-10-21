@@ -40,15 +40,15 @@ int main(void)
 	initializePins();
 
 
-	char randomLetters[] = "abcd";
-	char secondRandomLetters[] = "dcba";
+	char randomLetters[] = "1234";
+	char secondRandomLetters[] = "4321";
 
     /* Loop forever */
 	while(1) {
-		simple_delay((uint32_t) 1000000);
+		//simple_delay((uint32_t) 1000000);
 		flashDisplay(randomLetters);
-		simple_delay((uint32_t) 1000000);
-		flashDisplay(secondRandomLetters);
+		//simple_delay((uint32_t) 1000000);
+		//flashDisplay(secondRandomLetters);
 	}
 
 	return 0;
