@@ -60,7 +60,7 @@ void initializePins()
 {
 
 	// Initializing the clocks for ports A, B, G, H, I
-	RCC->AHB1ENR = RCC->AHB1ENR |= (111000011);
+	RCC->AHB1ENR = RCC->AHB1ENR |= 0b111000011;
 
 	// Initialization for 7-segment display pins (D2-D8 = A-G)
 
@@ -132,22 +132,22 @@ void flashSegment(char theCharacter) // possibly add code to turn lights on and 
 	GPIOG->ODR = 0 | ((segmentCode & 0b1) << 6);
 
 	// Assigns bit 1 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
-	GPIOB->ODR = ((segmentCode & 0b10) << 4);
+	GPIOB->ODR = ((segmentCode & 0b10 >> 1) << 4);
 
 	// Assigns bit 2 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
-	GPIOG->ODR |= ((segmentCode & 0b100) << 7);
+	GPIOG->ODR |= ((segmentCode & 0b100 >> 2) << 7);
 
 	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PA8 on the processor)
-	GPIOA->ODR = 0 | ((segmentCode & 0b1000) << 8);
+	GPIOA->ODR = 0 | ((segmentCode & 0b1000 >> 3) << 8);
 
 	// Assigns bit 4 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
-	GPIOH->ODR = 0 | ((segmentCode & 0b10000) << 6);
+	GPIOH->ODR = 0 | ((segmentCode & 0b10000 >> 4) << 6);
 
 	// Assigns bit 5 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
-	GPIOI->ODR = 0 | ((segmentCode & 0b100000) << 3);
+	GPIOI->ODR = 0 | ((segmentCode & 0b100000 >> 5) << 3);
 
 	// Assigns Bit 6 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
-	GPIOI->ODR |= (segmentCode & (0b1 << 6) <<2);
+	GPIOI->ODR |= ((segmentCode & (0b1 << 6) >> 6) <<2);
 }
 
 /**
