@@ -60,44 +60,70 @@ void initializePins()
 {
 
 	// Initializing the clocks for ports A, B, G, H, I
-	RCC->AHB1ENR = RCC->AHB1ENR |= 0b111000011;
+	RCC->AHB1ENR |= 0b111000011;
+	(void)RCC->AHB1ENR;   // read back so the clocks are running before GPIO access
+
+	// Each pin only clears its own MODER/OTYPER bits so the SWD debug
+	// pins (PA13, PA14) and PB3 keep their settings.
 
 	// Initialization for 7-segment display pins (D2-D8 = A-G)
 
-	// Initializes D5 as push-pull
-	GPIOA->MODER &= 0;
-	GPIOA->MODER |= 0xA8000000;
-	GPIOA->MODER |= (0b01 << (2 * 8));
-	GPIOA->OTYPER &= 0;
+	// Initializes D2 (PG6, segment A) as push-pull output
+	GPIOG->MODER  &= ~(3UL << (2 * 6));
+	GPIOG->MODER  |=  (1UL << (2 * 6));
+	GPIOG->OTYPER &= ~(1UL << 6);
 
-	// Initializes D3 as push-pull
-	GPIOB->MODER &= 0;
-	GPIOB->MODER |= 0X00000280;
-	GPIOB->MODER |= (0b01 << (2 * 4));
-	GPIOB->OTYPER &= 0;
+	// Initializes D3 (PB4, segment B) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 4));
+	GPIOB->MODER  |=  (1UL << (2 * 4));
+	GPIOB->OTYPER &= ~(1UL << 4);
 
-	// Initializes D2 and D4 as push-pull
-	GPIOG->MODER &= 0;
-	GPIOG->MODER |= (0b0101 << (6 * 2));
-	GPIOG->OTYPER &= 0;
+	// Initializes D4 (PG7, segment C) as push-pull output
+	GPIOG->MODER  &= ~(3UL << (2 * 7));
+	GPIOG->MODER  |=  (1UL << (2 * 7));
+	GPIOG->OTYPER &= ~(1UL << 7);
 
-	// Initializes D6 as push-pull
-	GPIOH->MODER &= 0;
-	GPIOH->MODER |= (0b01 << (6 * 2));
-	GPIOH->OTYPER &=0;
+	// Initializes D5 (PA8, segment D) as push-pull output
+	GPIOA->MODER  &= ~(3UL << (2 * 8));
+	GPIOA->MODER  |=  (1UL << (2 * 8));
+	GPIOA->OTYPER &= ~(1UL << 8);
 
-	// Initializes D7 and D8 as push-pull pins
-	GPIOI->MODER &= 0;
-	GPIOI->MODER |= (0b0101 << 2);
-	GPIOI->OTYPER &= 0;
+	// Initializes D6 (PH6, segment E) as push-pull output
+	GPIOH->MODER  &= ~(3UL << (2 * 6));
+	GPIOH->MODER  |=  (1UL << (2 * 6));
+	GPIOH->OTYPER &= ~(1UL << 6);
 
+	// Initializes D7 (PI3, segment F) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 3));
+	GPIOI->MODER  |=  (1UL << (2 * 3));
+	GPIOI->OTYPER &= ~(1UL << 3);
 
-	// Initialization for digit selection (D10-D13).
-	// I am not clearing out the registers because it was already done above when
-	// initializing the 7-segment pins
-	GPIOI->MODER |= 0B0101; // Initializes D10 and D13
+	// Initializes D8 (PI2, segment G) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 2));
+	GPIOI->MODER  |=  (1UL << (2 * 2));
+	GPIOI->OTYPER &= ~(1UL << 2);
 
-	GPIOB->MODER |= (0b0101 << (2 * 14)); // initializes D11 and D12
+	// Initialization for digit selection (D10-D13)
+
+	// Initializes D10 (PI0) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 0));
+	GPIOI->MODER  |=  (1UL << (2 * 0));
+	GPIOI->OTYPER &= ~(1UL << 0);
+
+	// Initializes D11 (PB15) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 15));
+	GPIOB->MODER  |=  (1UL << (2 * 15));
+	GPIOB->OTYPER &= ~(1UL << 15);
+
+	// Initializes D12 (PB14) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 14));
+	GPIOB->MODER  |=  (1UL << (2 * 14));
+	GPIOB->OTYPER &= ~(1UL << 14);
+
+	// Initializes D13 (PI1) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 1));
+	GPIOI->MODER  |=  (1UL << (2 * 1));
+	GPIOI->OTYPER &= ~(1UL << 1);
 }
 
 void flashDisplay(char *theString) {
@@ -132,22 +158,22 @@ void flashSegment(char theCharacter) // possibly add code to turn lights on and 
 	GPIOG->ODR = 0 | ((segmentCode & 0b1) << 6);
 
 	// Assigns bit 1 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
-	GPIOB->ODR = ((segmentCode & 0b10 >> 1) << 4);
+	GPIOB->ODR = ((segmentCode >> 1) & 1) << 4;
 
 	// Assigns bit 2 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
-	GPIOG->ODR |= ((segmentCode & 0b100 >> 2) << 7);
+	GPIOG->ODR |= ((segmentCode >> 2) & 1) << 7;
 
 	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PA8 on the processor)
-	GPIOA->ODR = 0 | ((segmentCode & 0b1000 >> 3) << 8);
+	GPIOA->ODR = ((segmentCode >> 3) & 1) << 8;
 
 	// Assigns bit 4 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
-	GPIOH->ODR = 0 | ((segmentCode & 0b10000 >> 4) << 6);
+	GPIOH->ODR = ((segmentCode >> 4) & 1) << 6;
 
 	// Assigns bit 5 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
-	GPIOI->ODR = 0 | ((segmentCode & 0b100000 >> 5) << 3);
+	GPIOI->ODR = ((segmentCode >> 5) & 1) << 3;
 
 	// Assigns Bit 6 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
-	GPIOI->ODR |= ((segmentCode & (0b1 << 6) >> 6) <<2);
+	GPIOI->ODR |= ((segmentCode >> 6) & 1) << 2;
 }
 
 /**
