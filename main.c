@@ -18,10 +18,18 @@
 
 #include <stdint.h>
 #include "stm32f7xx.h"
+#include <stdio.h>
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
+
+void initializePins();
+int translateCharacter(char);
+void flashSegment(char);
+void flashDisplay(char*);
+void simple_delay(uint32_t count);
+
 
 /* ---------------------------------------------------------------------------
  * FSM definitions
@@ -101,20 +109,39 @@ static uint8_t read_inputs(void)
 static void display_value(uint16_t value)
 {
     (void)value;
-    /* TODO: drive the 7-segment display */
+    char str[5]; // Ensure the array is large enough for the digits, sign, and null-terminator
+
+    // Convert int to string safely
+    snprintf(str, sizeof(str), "%d", value);
+    flashDisplay(str);
 }
 
 /* Shows the current operator on the 7-segment display */
 static void display_operator(Operator o)
 {
     (void)o;
-    /* TODO: drive the 7-segment display */
+    switch(o) {
+    	case OP_ADD:
+			flashDisplay("add");
+    		break;
+    	case OP_SUB:
+			flashDisplay("sub");
+			break;
+    	case OP_MUL:
+			flashDisplay("mul");
+			break;
+    	case OP_DIV:
+			flashDisplay("div");
+			break;
+    	default:
+    		flashDisplay("err");
+    }
 }
 
 /* Shows an error indication on the 7-segment display */
 static void display_error(void)
 {
-    /* TODO: drive the 7-segment display */
+	flashDisplay("err");
 }
 
 /* ---------------------------------------------------------------------------
@@ -304,6 +331,154 @@ static void fsm_display(uint8_t level)
     }
 }
 
+// How long each digit stays lit while scanning (roughly 2 ms at the 16 MHz default clock)
+#define DIGIT_HOLD_DELAY 4000
+
+/**
+ * Shows a 4-character string by lighting one digit at a time. Each digit is
+ * held for DIGIT_HOLD_DELAY, so this must be called repeatedly (e.g. every pass
+ * of the main loop) for all four digits to appear lit at once.
+ */
+void flashDisplay(char *theString) {
+
+	// Digit 1 (D10, PA8)
+	GPIOA->ODR &= ~(0b1 << 8);                     // turn off all digits before changing segments
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
+	flashSegment(theString[0]);
+	GPIOA->ODR |= (0b1 << 8);
+	simple_delay(DIGIT_HOLD_DELAY);
+
+	// Digit 2 (D11, PB15)
+	GPIOA->ODR &= ~(0b1 << 8);
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
+	flashSegment(theString[1]);
+	GPIOB->ODR |= (0b1 << 15);
+	simple_delay(DIGIT_HOLD_DELAY);
+
+	// Digit 3 (D12, PB14)
+	GPIOA->ODR &= ~(0b1 << 8);
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
+	flashSegment(theString[2]);
+	GPIOB->ODR |= (0b1 << 14);
+	simple_delay(DIGIT_HOLD_DELAY);
+
+	// Digit 4 (D13, PI1)
+	GPIOA->ODR &= ~(0b1 << 8);
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
+	flashSegment(theString[3]);
+	GPIOI->ODR |= (0b1 << 1);
+	simple_delay(DIGIT_HOLD_DELAY);
+
+	// Turn the last digit off so it isn't brighter than the others
+	GPIOI->ODR &= ~(0b1 << 1);
+}
+
+/**
+ * Drives segments A-G for one character. The segment codes from
+ * translateCharacter() store segment A in bit 6 down to segment G in bit 0.
+ */
+void flashSegment(char theCharacter)
+{
+	int segmentCode = translateCharacter(theCharacter);
+
+	// Assigns bit 6 in the 7-segment display sequence to Segment A (D2 on the board, PG6 on the processor)
+	GPIOG->ODR = ((segmentCode >> 6) & 1) << 6;
+
+	// Assigns bit 5 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
+	GPIOB->ODR = ((segmentCode >> 5) & 1) << 4;
+
+	// Assigns bit 4 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
+	GPIOG->ODR |= ((segmentCode >> 4) & 1) << 7;
+
+	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PI0 on the processor)
+	// Segments D, F, and G share port I, so only this first write uses '='
+	GPIOI->ODR = ((segmentCode >> 3) & 1) << 0;
+
+	// Assigns bit 2 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
+	GPIOH->ODR = ((segmentCode >> 2) & 1) << 6;
+
+	// Assigns bit 1 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
+	GPIOI->ODR |= ((segmentCode >> 1) & 1) << 3;
+
+	// Assigns bit 0 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
+	GPIOI->ODR |= (segmentCode & 1) << 2;
+}
+
+/**
+ * Takes a character and translates it into a set of bits that are used
+ * for displaying on a sever-segment display.
+ */
+int translateCharacter(char theCharacter)
+{
+	int segmentCode;
+
+	switch (theCharacter){
+	case '0':
+		segmentCode = 0b0000001;
+		break;
+	case '1':
+		segmentCode = 0b1001111;
+		break;
+	case '2':
+		segmentCode = 0b0010010;
+		break;
+	case '3':
+		segmentCode = 0b0000110;
+		break;
+	case '4':
+		segmentCode = 0b1001100;
+		break;
+	case '5':
+		segmentCode = 0b0100100;
+		break;
+	case '6':
+		segmentCode = 0b0100000;
+		break;
+	case '7':
+		segmentCode = 0b0001101;
+		break;
+	case '8':
+		segmentCode = 0b0000000;
+		break;
+	case '9':
+		segmentCode = 0b0000100;
+		break;
+	case 'a':
+		segmentCode = 0b0001000;
+		break;
+	case 'd':
+		segmentCode = 0b1000010;
+		break;
+	case 'e':
+		segmentCode = 0b0110000;
+		break;
+	case 'i':
+		segmentCode = 0b1001000;
+		break;
+	case 'r':
+		segmentCode = 0b1111010;
+		break;
+	case 's':
+		segmentCode = 0b0100100;
+		break;
+	case 'u':
+		segmentCode = 0b1000001;
+		break;
+	case 'v':
+		segmentCode = 0b0011100;
+		break;
+	default:
+		segmentCode = 255;
+		break;
+	}
+
+	return segmentCode;
+}
+
 /*
  * Input pins are:
  *
@@ -315,6 +490,10 @@ static void fsm_display(uint8_t level)
  */
 int main(void)
 {
+	// Initializing the clocks for ports A, B, G, H, I
+	RCC->AHB1ENR |= 0b111000011;
+	(void)RCC->AHB1ENR;   // read back so the clocks are running before GPIO access
+
 	// Enable the clock for GPIO port F
 	// In the AHB1ENR register, Bit 5 enables GPIOF
 	RCC->AHB1ENR |= (1UL << 5);
@@ -344,6 +523,68 @@ int main(void)
 	// Configure PF7 to be Pull-up using GPIO_PUPDR
 	GPIOF->PUPDR |= (1UL << (2*7)); //PUPDR = Pull Up Pull Down Register
 
+	// Each pin only clears its own MODER/OTYPER bits so the SWD debug
+	// pins (PA13, PA14) and PB3 keep their settings.
+
+	// Initialization for 7-segment display pins (D2-D8 = A-G)
+
+	// Initializes D2 (PG6, segment A) as push-pull output
+	GPIOG->MODER  &= ~(3UL << (2 * 6));
+	GPIOG->MODER  |=  (1UL << (2 * 6));
+	GPIOG->OTYPER &= ~(1UL << 6);
+
+	// Initializes D3 (PB4, segment B) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 4));
+	GPIOB->MODER  |=  (1UL << (2 * 4));
+	GPIOB->OTYPER &= ~(1UL << 4);
+
+	// Initializes D4 (PG7, segment C) as push-pull output
+	GPIOG->MODER  &= ~(3UL << (2 * 7));
+	GPIOG->MODER  |=  (1UL << (2 * 7));
+	GPIOG->OTYPER &= ~(1UL << 7);
+
+	// Initializes D5 (PI0, segment D) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 0));
+	GPIOI->MODER  |=  (1UL << (2 * 0));
+	GPIOI->OTYPER &= ~(1UL << 0);
+
+	// Initializes D6 (PH6, segment E) as push-pull output
+	GPIOH->MODER  &= ~(3UL << (2 * 6));
+	GPIOH->MODER  |=  (1UL << (2 * 6));
+	GPIOH->OTYPER &= ~(1UL << 6);
+
+	// Initializes D7 (PI3, segment F) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 3));
+	GPIOI->MODER  |=  (1UL << (2 * 3));
+	GPIOI->OTYPER &= ~(1UL << 3);
+
+	// Initializes D8 (PI2, segment G) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 2));
+	GPIOI->MODER  |=  (1UL << (2 * 2));
+	GPIOI->OTYPER &= ~(1UL << 2);
+
+	// Initialization for digit selection (D10-D13)
+
+	// Initializes D10 (PA8) as push-pull output
+	GPIOA->MODER  &= ~(3UL << (2 * 8));
+	GPIOA->MODER  |=  (1UL << (2 * 8));
+	GPIOA->OTYPER &= ~(1UL << 8);
+
+	// Initializes D11 (PB15) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 15));
+	GPIOB->MODER  |=  (1UL << (2 * 15));
+	GPIOB->OTYPER &= ~(1UL << 15);
+
+	// Initializes D12 (PB14) as push-pull output
+	GPIOB->MODER  &= ~(3UL << (2 * 14));
+	GPIOB->MODER  |=  (1UL << (2 * 14));
+	GPIOB->OTYPER &= ~(1UL << 14);
+
+	// Initializes D13 (PI1) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 1));
+	GPIOI->MODER  |=  (1UL << (2 * 1));
+	GPIOI->OTYPER &= ~(1UL << 1);
+
     for (;;) {
         uint8_t level  = read_inputs();
         uint8_t falling = ~level & inputs_prev;
@@ -351,5 +592,11 @@ int main(void)
 
         fsm_step(falling);
         fsm_display(level);
+    }
+}
+
+void simple_delay(uint32_t count) {
+    while (count--) {
+        __asm__("NOP");
     }
 }
