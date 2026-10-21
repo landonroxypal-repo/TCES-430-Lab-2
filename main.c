@@ -45,9 +45,9 @@ int main(void)
 
     /* Loop forever */
 	while(1) {
-		simple_delay((uint32_t) 1000);
+		simple_delay((uint32_t) 1000000);
 		flashDisplay(randomLetters);
-		simple_delay(1000);
+		simple_delay((uint32_t) 1000000);
 		flashDisplay(secondRandomLetters);
 	}
 
