@@ -40,7 +40,7 @@ int main(void)
 	initializePins();
 
 
-	char randomLetters[] = "8888";
+	char randomLetters[] = "1234";
 	char secondRandomLetters[] = "4321";
 
     /* Loop forever */
@@ -83,10 +83,10 @@ void initializePins()
 	GPIOG->MODER  |=  (1UL << (2 * 7));
 	GPIOG->OTYPER &= ~(1UL << 7);
 
-	// Initializes D5 (PA8, segment D) as push-pull output
-	GPIOA->MODER  &= ~(3UL << (2 * 8));
-	GPIOA->MODER  |=  (1UL << (2 * 8));
-	GPIOA->OTYPER &= ~(1UL << 8);
+	// Initializes D5 (PI0, segment D) as push-pull output
+	GPIOI->MODER  &= ~(3UL << (2 * 0));
+	GPIOI->MODER  |=  (1UL << (2 * 0));
+	GPIOI->OTYPER &= ~(1UL << 0);
 
 	// Initializes D6 (PH6, segment E) as push-pull output
 	GPIOH->MODER  &= ~(3UL << (2 * 6));
@@ -105,10 +105,10 @@ void initializePins()
 
 	// Initialization for digit selection (D10-D13)
 
-	// Initializes D10 (PI0) as push-pull output
-	GPIOI->MODER  &= ~(3UL << (2 * 0));
-	GPIOI->MODER  |=  (1UL << (2 * 0));
-	GPIOI->OTYPER &= ~(1UL << 0);
+	// Initializes D10 (PA8) as push-pull output
+	GPIOA->MODER  &= ~(3UL << (2 * 8));
+	GPIOA->MODER  |=  (1UL << (2 * 8));
+	GPIOA->OTYPER &= ~(1UL << 8);
 
 	// Initializes D11 (PB15) as push-pull output
 	GPIOB->MODER  &= ~(3UL << (2 * 15));
@@ -136,30 +136,34 @@ void initializePins()
  */
 void flashDisplay(char *theString) {
 
-	// Digit 1 (D10, PI0)
-	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));     // turn off all digits before changing segments
+	// Digit 1 (D10, PA8)
+	GPIOA->ODR &= ~(0b1 << 8);                     // turn off all digits before changing segments
 	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
 	flashSegment(theString[0]);
-	GPIOI->ODR |= (0b1 << 0);
+	GPIOA->ODR |= (0b1 << 8);
 	simple_delay(DIGIT_HOLD_DELAY);
 
 	// Digit 2 (D11, PB15)
-	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOA->ODR &= ~(0b1 << 8);
 	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
 	flashSegment(theString[1]);
 	GPIOB->ODR |= (0b1 << 15);
 	simple_delay(DIGIT_HOLD_DELAY);
 
 	// Digit 3 (D12, PB14)
-	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOA->ODR &= ~(0b1 << 8);
 	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
 	flashSegment(theString[2]);
 	GPIOB->ODR |= (0b1 << 14);
 	simple_delay(DIGIT_HOLD_DELAY);
 
 	// Digit 4 (D13, PI1)
-	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOA->ODR &= ~(0b1 << 8);
 	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	GPIOI->ODR &= ~(0b1 << 1);
 	flashSegment(theString[3]);
 	GPIOI->ODR |= (0b1 << 1);
 	simple_delay(DIGIT_HOLD_DELAY);
@@ -185,14 +189,15 @@ void flashSegment(char theCharacter)
 	// Assigns bit 4 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
 	GPIOG->ODR |= ((segmentCode >> 4) & 1) << 7;
 
-	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PA8 on the processor)
-	GPIOA->ODR = ((segmentCode >> 3) & 1) << 8;
+	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PI0 on the processor)
+	// Segments D, F, and G share port I, so only this first write uses '='
+	GPIOI->ODR = ((segmentCode >> 3) & 1) << 0;
 
 	// Assigns bit 2 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
 	GPIOH->ODR = ((segmentCode >> 2) & 1) << 6;
 
 	// Assigns bit 1 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
-	GPIOI->ODR = ((segmentCode >> 1) & 1) << 3;
+	GPIOI->ODR |= ((segmentCode >> 1) & 1) << 3;
 
 	// Assigns bit 0 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
 	GPIOI->ODR |= (segmentCode & 1) << 2;
