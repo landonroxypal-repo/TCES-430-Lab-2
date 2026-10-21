@@ -16,6 +16,29 @@
  ******************************************************************************
  */
 
+/*
+ * Pinout (STM32F746G-DISCO)
+ *
+ * Header | MCU  | Peripheral
+ * -------+------+------------------------------------------
+ * A1     | PF10 | SW1 - increment digit (input, pull-up)
+ * A2     | PF9  | SW2 - next operator (input, pull-up)
+ * A3     | PF8  | SW3 - compute answer (input, pull-up)
+ * A4     | PF7  | SW4 - next / confirm (input, pull-up)
+ * B1     | PI11 | On-board user button - save / recall memory (input)
+ * D2     | PG6  | 7-segment segment A (output)
+ * D3     | PB4  | 7-segment segment B (output)
+ * D4     | PG7  | 7-segment segment C (output)
+ * D5     | PI0  | 7-segment segment D (output)
+ * D6     | PH6  | 7-segment segment E (output)
+ * D7     | PI3  | 7-segment segment F (output)
+ * D8     | PI2  | 7-segment segment G (output)
+ * D10    | PA8  | 7-segment digit 1 select (output)
+ * D11    | PB15 | 7-segment digit 2 select (output)
+ * D12    | PB14 | 7-segment digit 3 select (output)
+ * D13    | PI1  | 7-segment digit 4 select (output)
+ */
+
 #include <stdint.h>
 #include "stm32f7xx.h"
 
@@ -505,10 +528,10 @@ int translateCharacter(char theCharacter)
 /*
  * Input pins are:
  *
- * A2 - SW1 - PF10
- * A3 - SW2 - PF9
- * A4 - SW3 - PF8
- * A5 - SW4 - PF7
+ * A1 - SW1 - PF10
+ * A2 - SW2 - PF9
+ * A3 - SW3 - PF8
+ * A4 - SW4 - PF7
  * B1 - B1 - PI11
  */
 int main(void)
