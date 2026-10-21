@@ -18,7 +18,6 @@
 
 #include <stdint.h>
 #include "stm32f7xx.h"
-#include <stdio.h>
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
@@ -108,11 +107,16 @@ static uint8_t read_inputs(void)
 /* Shows a value on the 7-segment display */
 static void display_value(uint16_t value)
 {
-    (void)value;
-    char str[5]; // Ensure the array is large enough for the digits, sign, and null-terminator
+    char str[5]; // 4 digits + null-terminator
 
-    // Convert int to string safely
-    snprintf(str, sizeof(str), "%d", value);
+    // Convert to 4 zero-padded digit characters, thousands first, so every
+    // display position always gets a valid character
+    str[0] = (char)('0' + (value / 1000) % 10);
+    str[1] = (char)('0' + (value / 100) % 10);
+    str[2] = (char)('0' + (value / 10) % 10);
+    str[3] = (char)('0' + value % 10);
+    str[4] = '\0';
+
     flashDisplay(str);
 }
 
@@ -450,6 +454,9 @@ int translateCharacter(char theCharacter)
 	case 'a':
 		segmentCode = 0b0001000;
 		break;
+	case 'b':
+		segmentCode = 0b1100000;
+		break;
 	case 'd':
 		segmentCode = 0b1000010;
 		break;
@@ -458,6 +465,13 @@ int translateCharacter(char theCharacter)
 		break;
 	case 'i':
 		segmentCode = 0b1001000;
+		break;
+	case 'l':
+		segmentCode = 0b1110001;
+		break;
+	case 'm':
+		// 7-segment approximation of 'm': an 'n' with the top bar
+		segmentCode = 0b0101010;
 		break;
 	case 'r':
 		segmentCode = 0b1111010;
