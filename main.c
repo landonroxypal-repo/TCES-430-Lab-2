@@ -48,6 +48,7 @@ typedef enum {
     STATE_DIGIT4_INC,
     STATE_OPERATOR,
     STATE_OPERATOR_INC,
+    STATE_YIELD,
     STATE_COMPUTE,
     STATE_ERROR,
     STATE_SHOW_ANSWER,
@@ -233,9 +234,9 @@ static void fsm_step(uint8_t falling)
             current_state = STATE_DIGIT4_INC;
         } else if (falling & IN_SW4) {
             if (flags & FLAG_OPERAND2) {
-                /* Finished operand 2 */
+                /* Finished operand 2: wait for SW3 before computing */
                 operand2 = digits_to_value();
-                current_state = STATE_COMPUTE;
+                current_state = STATE_YIELD;
             } else {
                 /* Finished operand 1 */
                 operand1 = digits_to_value();
@@ -252,7 +253,7 @@ static void fsm_step(uint8_t falling)
     /* ----- Operator selection ----- */
     case STATE_OPERATOR:
         if (falling & IN_SW2)      current_state = STATE_OPERATOR_INC;
-        else if (falling & IN_SW3) current_state = STATE_SELECT_OPERAND2;
+        else if (falling & IN_SW4) current_state = STATE_SELECT_OPERAND2;
         break;
 
     case STATE_OPERATOR_INC:
@@ -261,6 +262,10 @@ static void fsm_step(uint8_t falling)
         break;
 
     /* ----- Result ----- */
+    case STATE_YIELD:
+        if (falling & IN_SW3) current_state = STATE_COMPUTE;
+        break;
+
     case STATE_COMPUTE:
         switch (op) {
         case OP_ADD: answer = (int32_t)operand1 + operand2; break;
@@ -314,6 +319,10 @@ static void fsm_display(uint8_t level)
     case STATE_DIGIT3: case STATE_DIGIT3_INC:
     case STATE_DIGIT4: case STATE_DIGIT4_INC:
         display_value(digits_to_value());
+        break;
+
+    case STATE_YIELD:
+        display_value(operand2);
         break;
 
     case STATE_OPERATOR:
