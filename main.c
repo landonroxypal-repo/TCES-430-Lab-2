@@ -29,8 +29,7 @@ void initializePins();
 int translateCharacter(char);
 void flashSegment(char);
 void flashDisplay(char*);
-
-
+void simple_delay(uint32_t count);
 
 
 int main(void)
@@ -41,10 +40,17 @@ int main(void)
 	initializePins();
 
 
-
+	char randomLetters[] = "abcd";
+	char secondRandomLetters[] = "dcba";
 
     /* Loop forever */
-	for(;;);
+	while(1) {
+		simple_delay((uint32_t) 1000);
+		flashDisplay(randomLetters);
+		simple_delay(1000);
+		flashDisplay(secondRandomLetters);
+	}
+
 	return 0;
 }
 
@@ -81,7 +87,7 @@ void initializePins()
 	// Initializes D7 and D8 as push-pull pins
 	GPIOI->MODER &= 0;
 	GPIOI->MODER |= (0b0101 << 2);
-	GPIOI->OTPYER &= 0;
+	GPIOI->OTYPER &= 0;
 
 
 	// Initialization for digit selection (D10-D13).
@@ -89,10 +95,10 @@ void initializePins()
 	// initializing the 7-segment pins
 	GPIOI->MODER |= 0B0101; // Initializes D10 and D13
 
-	GPIOB->MODER |= (0b0101 << (2 * 15)); // initializes D11 and D12
+	GPIOB->MODER |= (0b0101 << (2 * 14)); // initializes D11 and D12
 }
 
-void flashDisplay(char *theString[]) {
+void flashDisplay(char *theString) {
 
 	// Flashes segment 1
 	flashSegment(*theString);
