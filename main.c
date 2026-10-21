@@ -66,11 +66,13 @@ void initializePins()
 
 	// Initializes D5 as push-pull
 	GPIOA->MODER &= 0;
+	GPIOA->MODER |= 0xA8000000;
 	GPIOA->MODER |= (0b01 << (2 * 8));
 	GPIOA->OTYPER &= 0;
 
 	// Initializes D3 as push-pull
 	GPIOB->MODER &= 0;
+	GPIOB->MODER |= 0X00000280;
 	GPIOB->MODER |= (0b01 << (2 * 4));
 	GPIOB->OTYPER &= 0;
 
