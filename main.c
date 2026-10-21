@@ -40,7 +40,7 @@ int main(void)
 	initializePins();
 
 
-	char randomLetters[] = "1234";
+	char randomLetters[] = "8888";
 	char secondRandomLetters[] = "4321";
 
     /* Loop forever */
@@ -126,54 +126,76 @@ void initializePins()
 	GPIOI->OTYPER &= ~(1UL << 1);
 }
 
+// How long each digit stays lit while scanning (roughly 2 ms at the 16 MHz default clock)
+#define DIGIT_HOLD_DELAY 4000
+
+/**
+ * Shows a 4-character string by lighting one digit at a time. Each digit is
+ * held for DIGIT_HOLD_DELAY, so this must be called repeatedly (e.g. every pass
+ * of the main loop) for all four digits to appear lit at once.
+ */
 void flashDisplay(char *theString) {
 
-	// Flashes segment 1
-	flashSegment(*theString);
+	// Digit 1 (D10, PI0)
+	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));     // turn off all digits before changing segments
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	flashSegment(theString[0]);
+	GPIOI->ODR |= (0b1 << 0);
+	simple_delay(DIGIT_HOLD_DELAY);
 
-	// turns on segment 1. Reset should happen during the flashSegment function
-	GPIOI->ODR |= 1;
-
-	// Flashes segment 2
-	flashSegment(*(++theString));
-
+	// Digit 2 (D11, PB15)
+	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	flashSegment(theString[1]);
 	GPIOB->ODR |= (0b1 << 15);
+	simple_delay(DIGIT_HOLD_DELAY);
 
-	// Flashes segment 3
-	flashSegment(*(++theString));
-
+	// Digit 3 (D12, PB14)
+	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	flashSegment(theString[2]);
 	GPIOB->ODR |= (0b1 << 14);
+	simple_delay(DIGIT_HOLD_DELAY);
 
-	// Flashes segment 4
-	flashSegment(*(++theString));
+	// Digit 4 (D13, PI1)
+	GPIOI->ODR &= ~((0b1 << 0) | (0b1 << 1));
+	GPIOB->ODR &= ~((0b1 << 14) | (0b1 << 15));
+	flashSegment(theString[3]);
+	GPIOI->ODR |= (0b1 << 1);
+	simple_delay(DIGIT_HOLD_DELAY);
 
-	GPIOI->ODR |= (0b1 <<1);
+	// Turn the last digit off so it isn't brighter than the others
+	GPIOI->ODR &= ~(0b1 << 1);
 }
 
-void flashSegment(char theCharacter) // possibly add code to turn lights on and off
+/**
+ * Drives segments A-G for one character. The segment codes from
+ * translateCharacter() store segment A in bit 6 down to segment G in bit 0.
+ */
+void flashSegment(char theCharacter)
 {
 	int segmentCode = translateCharacter(theCharacter);
 
-	// Assigns bit 0 in the 7-segment display sequence to Segment A (D2 on the board, PG6 on the processor)
-	GPIOG->ODR = 0 | ((segmentCode & 0b1) << 6);
+	// Assigns bit 6 in the 7-segment display sequence to Segment A (D2 on the board, PG6 on the processor)
+	GPIOG->ODR = ((segmentCode >> 6) & 1) << 6;
 
-	// Assigns bit 1 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
-	GPIOB->ODR = ((segmentCode >> 1) & 1) << 4;
+	// Assigns bit 5 in the 7-segment display sequence to Segment B (D3 on the board, PB4 on the processor)
+	GPIOB->ODR = ((segmentCode >> 5) & 1) << 4;
 
-	// Assigns bit 2 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
-	GPIOG->ODR |= ((segmentCode >> 2) & 1) << 7;
+	// Assigns bit 4 in the 7-segment display sequence to Segment C (D4 on the board, PG7 on the processor)
+	GPIOG->ODR |= ((segmentCode >> 4) & 1) << 7;
 
 	// Assigns bit 3 in the 7-segment display sequence to Segment D (D5 on the board, PA8 on the processor)
 	GPIOA->ODR = ((segmentCode >> 3) & 1) << 8;
 
-	// Assigns bit 4 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
-	GPIOH->ODR = ((segmentCode >> 4) & 1) << 6;
+	// Assigns bit 2 in the 7-segment display sequence to Segment E (D6 on the board, PH6 in the processor)
+	GPIOH->ODR = ((segmentCode >> 2) & 1) << 6;
 
-	// Assigns bit 5 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
-	GPIOI->ODR = ((segmentCode >> 5) & 1) << 3;
+	// Assigns bit 1 in the 7-segment display sequence to Segment F (D7 on the board, PI3 in the processor)
+	GPIOI->ODR = ((segmentCode >> 1) & 1) << 3;
 
-	// Assigns Bit 6 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
-	GPIOI->ODR |= ((segmentCode >> 6) & 1) << 2;
+	// Assigns bit 0 in the 7-segment display sequence to Segment G (D8 on the board, PI2 on the processor)
+	GPIOI->ODR |= (segmentCode & 1) << 2;
 }
 
 /**
